@@ -235,6 +235,10 @@ void PrintValuesSerial(){
   Serial.println("=====CCS811=====");
   if(ccs.available()){
     float temp = ccs.calculateTemperature();
+
+    //add enviromental data to improve readings
+    ccs.setEnvironmentalData(bme.humidity, bme.temperature);
+    
     if(!ccs.readData()){
       Serial.print("CO2: ");
       Serial.print(ccs.geteCO2());
