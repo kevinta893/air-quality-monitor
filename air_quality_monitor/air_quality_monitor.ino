@@ -23,20 +23,23 @@
 
 #include <ArduinoJson.h>
 #include <Arduino.h>
-#include "WiFi.h"
-
+#include <WiFi.h>
+#include <WiFiUdp.h>
+#include <NTPClient.h>
 
 #define SEALEVELPRESSURE_HPA (1013.25)
 
 // WiFi credentials. See external file
 #include "WiFi_Credentials.h"
 
+const int GMT_ZONE = -6;      //GMT timzeone number -7, 0, 5, 8, etc
 
+//sensors
 Adafruit_BME680 bme;    // I2C
 Adafruit_CCS811 ccs;     //I2C
 
 
-int statusPin = 13;     //used to indicate error
+int statusLED = 13;     //used to indicate error
 
 
 
@@ -49,7 +52,7 @@ StaticJsonBuffer<600> jsonReadBuffer;
 
 void setup() {
   Serial.begin(9600);
-  pinMode(statusPin, OUTPUT);
+  pinMode(statusLED, OUTPUT);
 
   SetupWifi();
 
@@ -63,6 +66,18 @@ void loop() {
   
   delay(2000);
 
+}
+
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP);
+
+String GetCurrentTimeString(){
+
+  //this function may take a while depending on the internet
+  while(!timeClient.update()) {
+    timeClient.forceUpdate();
+  }
+  return timeClient.getFormattedTime();
 }
 
 
@@ -105,21 +120,31 @@ void SetupWifi(){
     delay(5000);
   }
 
+
+  //Connected! Yay
+
+  //setup time
+  timeClient.begin();       //begin time client
+  timeClient.setTimeOffset(GMT_ZONE * 3600);
+
+
+  //print debug information
   Serial.println("");
   Serial.println("WiFi connected");
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
-
+  Serial.print("Local time:");
+  Serial.println(GetCurrentTimeString());
   Serial.println("Hello World, I'm connected to the internets!!");
 }
 
 
 void SetupBME680(){
   while (!Serial);
-  Serial.println("BME680 test");
+  Serial.println("BME680 starting...");
 
   if (!bme.begin()) {
-    Serial.println("Could not find a valid BME680 sensor, check wiring!");
+    Serial.println("Failed to start BME680 sensor! Please check your wiring.");
     while (1);
   }
 
@@ -133,10 +158,10 @@ void SetupBME680(){
 }
 
 void SetupCCS811(){
-  Serial.println("CCS811 test");
+  Serial.println("CCS811 starting...");
   
   if(!ccs.begin()){
-    Serial.println("Failed to start sensor! Please check your wiring.");
+    Serial.println("Failed to start CCS811 sensor! Please check your wiring.");
     while(1);
   }
 
@@ -171,6 +196,7 @@ void PrintValuesSerial(){
     Serial.println("WiFi disconnected :(");
   }
 
+  Serial.println("Current time: " + GetCurrentTimeString());
   Serial.println();
 
 
