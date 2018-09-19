@@ -34,6 +34,7 @@
 
 const int GMT_ZONE = -6;      //GMT timzeone number -7, 0, 5, 8, etc
 
+
 //sensors
 Adafruit_BME680 bme;    // I2C
 Adafruit_CCS811 ccs;     //I2C
@@ -172,7 +173,7 @@ void SetupCCS811(){
 }
 
 
-int frameCount = 0;
+unsigned int frameCount = 0;
 //Print out the current sensor values and state to serial.
 void PrintValuesSerial(){
 
