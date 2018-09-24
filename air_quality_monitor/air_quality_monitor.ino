@@ -1,19 +1,3 @@
-/***************************************************************************
-  This is a library for the BME680 gas, humidity, temperature & pressure sensor
-
-  Designed specifically to work with the Adafruit BME680 Breakout
-  ----> http://www.adafruit.com/products/3660
-
-  These sensors use I2C or SPI to communicate, 2 or 4 pins are required
-  to interface.
-
-  Adafruit invests time and resources providing this open source code,
-  please support Adafruit and open-source hardware by purchasing products
-  from Adafruit!
-
-  Written by Limor Fried & Kevin Townsend for Adafruit Industries.
-  BSD license, all text above must be included in any redistribution
- ***************************************************************************/
 
 #include <Wire.h>
 #include <SPI.h>
@@ -21,10 +5,13 @@
 #include "Adafruit_BME680.h"
 #include "Adafruit_CCS811.h"
 
+//wifi
 #include <ArduinoJson.h>
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
+
+//time keeping
 #include <NTPClient.h>
 
 #define SEALEVELPRESSURE_HPA (1013.25)
@@ -42,6 +29,17 @@ Adafruit_CCS811 ccs;     //I2C
 
 int statusLED = 13;     //used to indicate error
 
+//BME 680 Calibration
+const float TEMP_OFFSET = -2.1f;
+const float PRESSURE_OFFSET = 0;
+const float HUMIDITY_OFFSET = 0;
+const float GAS_RESISTANCE_OFFSET = 0;
+const float ALTITUDE_OFFSET = 0;
+
+//ccs811
+const float CO2_OFFSET = 0;
+const float TVOC_OFFSET = 0; 
+const float TEMP_811_OFFSET = 0;
 
 
 
@@ -144,9 +142,9 @@ void SetupBME680(){
   while (!Serial);
   Serial.println("BME680 starting...");
 
-  if (!bme.begin()) {
+  while (!bme.begin()) {
     Serial.println("Failed to start BME680 sensor! Please check your wiring.");
-    while (1);
+    delay(2000);
   }
 
   // Set up oversampling and filter initialization
@@ -209,23 +207,23 @@ void PrintValuesSerial(){
   }
 
   Serial.print("Temperature = ");
-  Serial.print(bme.temperature);
+  Serial.print(bme.temperature + TEMP_OFFSET);
   Serial.println(" *C");
 
   Serial.print("Pressure = ");
-  Serial.print(bme.pressure / 100.0);
+  Serial.print((bme.pressure / 100.0) + PRESSURE_OFFSET);
   Serial.println(" hPa");
 
   Serial.print("Humidity = ");
-  Serial.print(bme.humidity);
+  Serial.print(bme.humidity + HUMIDITY_OFFSET);
   Serial.println(" %");
 
   Serial.print("Gas = ");
-  Serial.print(bme.gas_resistance / 1000.0);
+  Serial.print((bme.gas_resistance / 1000.0) + GAS_RESISTANCE_OFFSET);
   Serial.println(" KOhms");
 
   Serial.print("Approx. Altitude = ");
-  Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA));
+  Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA) + ALTITUDE_OFFSET);
   Serial.println(" m");
 
   Serial.println();
@@ -237,15 +235,15 @@ void PrintValuesSerial(){
     float temp = ccs.calculateTemperature();
 
     //add enviromental data to improve readings
-    ccs.setEnvironmentalData(bme.humidity, bme.temperature);
+    ccs.setEnvironmentalData(bme.humidity + HUMIDITY_OFFSET, bme.temperature + TEMP_OFFSET);
     
     if(!ccs.readData()){
       Serial.print("CO2: ");
-      Serial.print(ccs.geteCO2());
+      Serial.print(ccs.geteCO2() + CO2_OFFSET);
       Serial.print("ppm, TVOC: ");
-      Serial.print(ccs.getTVOC());
+      Serial.print(ccs.getTVOC() + TVOC_OFFSET);
       Serial.print("ppb   Temp:");
-      Serial.println(temp);
+      Serial.println(temp + TEMP_811_OFFSET);
  
     }
     else{
