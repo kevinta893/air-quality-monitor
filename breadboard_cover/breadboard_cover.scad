@@ -1,7 +1,7 @@
 
 //Breadboard itself (no feet) is 82mm x 55mm x 10mm
 
-printTolerance = 1.3;
+printTolerance = 0.7;
 
 boardLength = 82;
 boardWidth = 55;
