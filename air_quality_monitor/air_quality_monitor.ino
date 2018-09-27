@@ -18,6 +18,8 @@
 
 // WiFi credentials. See external file
 #include "WiFi_Credentials.h"
+const char* WIFI_HOSTNAME = "Arduino Air Monitor";
+
 
 const int GMT_ZONE = -6;      //GMT timzeone number -7, 0, 5, 8, etc
 
@@ -105,6 +107,7 @@ void SetupWifi(){
   delay(100);
 
   Serial.println("Connecting...");
+  WiFi.setHostname(WIFI_HOSTNAME);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
 
   while (WiFi.status() != WL_CONNECTED) {
