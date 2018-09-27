@@ -143,9 +143,11 @@ void SetupBME680(){
   Serial.println("BME680 starting...");
 
   while (!bme.begin()) {
-    Serial.println("Failed to start BME680 sensor! Please check your wiring.");
+    Serial.println("Failed to start BME680 sensor! Please check your wiring. Retrying...");
     delay(2000);
   }
+
+  Serial.println("BME680 started.");
 
   // Set up oversampling and filter initialization
   bme.setTemperatureOversampling(BME680_OS_8X);
@@ -159,10 +161,12 @@ void SetupBME680(){
 void SetupCCS811(){
   Serial.println("CCS811 starting...");
   
-  if(!ccs.begin()){
-    Serial.println("Failed to start CCS811 sensor! Please check your wiring.");
-    while(1);
+  while(!ccs.begin()){
+    Serial.println("Failed to start CCS811 sensor! Please check your wiring. Retrying...");
+    delay(2000);
   }
+
+  Serial.println("CCS811 started.");
 
   //calibrate temperature sensor
   while(!ccs.available());
