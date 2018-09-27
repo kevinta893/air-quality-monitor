@@ -22,12 +22,15 @@
 const int GMT_ZONE = -6;      //GMT timzeone number -7, 0, 5, 8, etc
 
 
+
+
 //sensors
 Adafruit_BME680 bme;    // I2C
 Adafruit_CCS811 ccs;     //I2C
 
 
 int statusLED = 13;     //used to indicate error
+
 
 //BME 680 Calibration
 const float TEMP_OFFSET = -2.1f;
@@ -101,8 +104,8 @@ void SetupWifi(){
   WiFi.disconnect();
   delay(100);
 
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
   Serial.println("Connecting...");
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
 
   while (WiFi.status() != WL_CONNECTED) {
     // Check to see if connecting failed.
@@ -112,9 +115,6 @@ void SetupWifi(){
       Serial.println();
       Serial.print("SSID: ");
       Serial.println(WIFI_SSID);
-      Serial.print("Password: ");
-      Serial.println(WIFI_PASS);
-      Serial.println();
     }
     delay(5000);
   }
@@ -258,4 +258,3 @@ void PrintValuesSerial(){
 
   frameCount++;
 }
-
