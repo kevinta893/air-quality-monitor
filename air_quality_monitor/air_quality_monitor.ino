@@ -11,24 +11,22 @@
 #include <WiFi.h>
 #include <WiFiUdp.h>
 
-//time keeping
-#include <NTPClient.h>
-
 #define SEALEVELPRESSURE_HPA (1013.25)
 
 // WiFi credentials. See external file
 #include "WiFi_Credentials.h"
 const char* WIFI_HOSTNAME = "Arduino Air Monitor";
 
-
-const int GMT_ZONE = -6;      //GMT timzeone number -7, 0, 5, 8, etc
-
-
+// ThingSpeak API
+#include <ThingSpeak.h>
+#include "ThingSpeak_API_Keys.h"
+const int UPDATE_INTERVAL_SECONDS = 20 * 1000;
 
 
 //sensors
-Adafruit_BME680 bme;    // I2C
+Adafruit_BME680 bme;     //I2C
 Adafruit_CCS811 ccs;     //I2C
+
 
 
 int statusLED = 13;     //used to indicate error
@@ -47,11 +45,7 @@ const float TVOC_OFFSET = 0;
 const float TEMP_811_OFFSET = 0;
 
 
-
-//JSON buffers
-StaticJsonBuffer<600> jsonWriteBuffer;
-StaticJsonBuffer<600> jsonReadBuffer;
-
+WiFiClient wifiClient;
 
 
 void setup() {
@@ -62,26 +56,14 @@ void setup() {
 
   SetupBME680();        //Temperature, Pressure, Humidity, Gas (TVOC), Approx Altitude
   SetupCCS811();        //Temperature, CO2 (PPM), TVOC (PPB)
-  
+
+  ThingSpeak.begin(wifiClient);
 }
 
 void loop() {
-  PrintValuesSerial();
-  
-  delay(2000);
+  UpdateMonitoring();
+  delay(UPDATE_INTERVAL_SECONDS);
 
-}
-
-WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP);
-
-String GetCurrentTimeString(){
-
-  //this function may take a while depending on the internet
-  while(!timeClient.update()) {
-    timeClient.forceUpdate();
-  }
-  return timeClient.getFormattedTime();
 }
 
 
@@ -125,18 +107,12 @@ void SetupWifi(){
 
   //Connected! Yay
 
-  //setup time
-  timeClient.begin();       //begin time client
-  timeClient.setTimeOffset(GMT_ZONE * 3600);
-
 
   //print debug information
   Serial.println("");
   Serial.println("WiFi connected");
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
-  Serial.print("Local time:");
-  Serial.println(GetCurrentTimeString());
   Serial.println("Hello World, I'm connected to the internets!!");
 }
 
@@ -179,8 +155,8 @@ void SetupCCS811(){
 
 
 unsigned int frameCount = 0;
-//Print out the current sensor values and state to serial.
-void PrintValuesSerial(){
+
+void UpdateMonitoring(){
 
   //print current frame
   Serial.print("--------------Frame #");
@@ -200,37 +176,44 @@ void PrintValuesSerial(){
     Serial.println(WiFi.localIP());
   } else {
     Serial.println("WiFi disconnected :(");
+    //TODO.... GOTO ERROR
   }
 
-  Serial.println("Current time: " + GetCurrentTimeString());
   Serial.println();
 
 
   //BME680
   Serial.println("=====BME680=====");
-  if (! bme.performReading()) {
-    Serial.println("Failed to perform reading :(");
+  if (!bme.performReading()) {
+    Serial.println("Failed to perform reading from BME680 :(");
     return;
   }
 
+  float temperature = bme.temperature + TEMP_OFFSET;
+  float pressure = (bme.pressure / 100.0) + PRESSURE_OFFSET;
+  float humidity = bme.humidity + HUMIDITY_OFFSET;
+  float gas_resistance = (bme.gas_resistance / 1000.0f) + GAS_RESISTANCE_OFFSET;
+  float altitude = bme.readAltitude(SEALEVELPRESSURE_HPA) + ALTITUDE_OFFSET;
+  
+
   Serial.print("Temperature = ");
-  Serial.print(bme.temperature + TEMP_OFFSET);
+  Serial.print(temperature);
   Serial.println(" *C");
 
   Serial.print("Pressure = ");
-  Serial.print((bme.pressure / 100.0) + PRESSURE_OFFSET);
+  Serial.print(pressure);
   Serial.println(" hPa");
 
   Serial.print("Humidity = ");
-  Serial.print(bme.humidity + HUMIDITY_OFFSET);
+  Serial.print(humidity);
   Serial.println(" %");
 
   Serial.print("Gas = ");
-  Serial.print((bme.gas_resistance / 1000.0) + GAS_RESISTANCE_OFFSET);
+  Serial.print(gas_resistance);
   Serial.println(" KOhms");
 
   Serial.print("Approx. Altitude = ");
-  Serial.print(bme.readAltitude(SEALEVELPRESSURE_HPA) + ALTITUDE_OFFSET);
+  Serial.print(altitude);
   Serial.println(" m");
 
   Serial.println();
@@ -238,30 +221,46 @@ void PrintValuesSerial(){
 
   //CCS811
   Serial.println("=====CCS811=====");
-  if(ccs.available()){
-    float temp = ccs.calculateTemperature();
-
-    //add enviromental data to improve readings
-    ccs.setEnvironmentalData(bme.humidity + HUMIDITY_OFFSET, bme.temperature + TEMP_OFFSET);
-    
-    if(!ccs.readData()){
-      Serial.print("CO2: ");
-      Serial.print(ccs.geteCO2() + CO2_OFFSET);
-      Serial.print("ppm, TVOC: ");
-      Serial.print(ccs.getTVOC() + TVOC_OFFSET);
-      Serial.print("ppb   Temp:");
-      Serial.println(temp + TEMP_811_OFFSET);
- 
-    }
-    else{
-      Serial.println("ERROR!");
-      while(1);
-    }
+  if(!ccs.available()){
+    Serial.println("Error! CCS811 not available.");
+    return;
   }
+  if(ccs.readData()){
+    Serial.println("Failed to perform reading from CCS811 :(");
+    return;
+  }
+  
+  //add enviromental data to improve readings
+  ccs.setEnvironmentalData(bme.humidity + HUMIDITY_OFFSET, bme.temperature + TEMP_OFFSET);
+
+  float co2 = ccs.geteCO2() + CO2_OFFSET;
+  float tvoc = ccs.getTVOC() + TVOC_OFFSET;
+  float temperature_estimate = ccs.calculateTemperature() + TEMP_811_OFFSET;
+
+  Serial.print("CO2: ");
+  Serial.print(co2);
+  Serial.print("ppm, TVOC: ");
+  Serial.print(tvoc);
+  Serial.print("ppb   Temp:");
+  Serial.println(temperature_estimate);
+ 
 
   Serial.println();
   Serial.println();
 
 
   frameCount++;
+
+
+  //now send information to ThingSpeak
+  ThingSpeak.setField(1, temperature);
+  ThingSpeak.setField(2, pressure);
+  ThingSpeak.setField(3, humidity);
+  ThingSpeak.setField(4, gas_resistance);
+  ThingSpeak.setField(5, altitude);
+  ThingSpeak.setField(6, co2);
+  ThingSpeak.setField(7, tvoc);
+  ThingSpeak.setField(8, temperature_estimate);
+  
+  ThingSpeak.writeFields(THING_SPEAK_CHANNEL_NUMBER, WRITE_API_KEY);
 }
