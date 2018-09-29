@@ -58,6 +58,10 @@ void setup() {
   SetupCCS811();        //Temperature, CO2 (PPM), TVOC (PPB)
 
   ThingSpeak.begin(wifiClient);
+
+  Serial.println("Air monitor started.");
+  ThingSpeak.setStatus("Air monitor started and online.");
+  ThingSpeak.writeFields(THING_SPEAK_CHANNEL_NUMBER, WRITE_API_KEY);
 }
 
 void loop() {
