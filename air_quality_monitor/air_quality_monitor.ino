@@ -20,7 +20,7 @@ const char* WIFI_HOSTNAME = "Arduino Air Monitor";
 // ThingSpeak API
 #include <ThingSpeak.h>
 #include "ThingSpeak_API_Keys.h"
-const int UPDATE_INTERVAL_SECONDS = 20 * 1000;
+const int UPDATE_INTERVAL_SECONDS = 60 * 1000;
 
 
 //sensors
