@@ -29,7 +29,7 @@ Adafruit_CCS811 ccs;     //I2C
 
 
 
-int statusLED = 13;     //used to indicate error
+int errorLED = 13;     //used to indicate error
 
 
 //BME 680 Calibration
@@ -44,13 +44,18 @@ const float CO2_OFFSET = 0;
 const float TVOC_OFFSET = 0; 
 const float TEMP_811_OFFSET = 0;
 
+//retry limit
+const int MAX_RETRY_LIMIT = 20;
+const int MAX_WIFI_RETRY_LIMIT = 15;
+
+
 
 WiFiClient wifiClient;
 
 
 void setup() {
   Serial.begin(9600);
-  pinMode(statusLED, OUTPUT);
+  pinMode(errorLED, OUTPUT);
 
   SetupWifi();
 
@@ -60,8 +65,7 @@ void setup() {
   ThingSpeak.begin(wifiClient);
 
   Serial.println("Air monitor started.");
-  ThingSpeak.setStatus("Air monitor started and online.");
-  ThingSpeak.writeFields(THING_SPEAK_CHANNEL_NUMBER, WRITE_API_KEY);
+  PostStatusMessage("Air monitor started and online.");
 }
 
 void loop() {
@@ -120,13 +124,18 @@ void SetupWifi(){
   Serial.println("Hello World, I'm connected to the internets!!");
 }
 
-
+int bme680SetupRetry = 0;
 void SetupBME680(){
   while (!Serial);
   Serial.println("BME680 starting...");
 
+  bme680SetupRetry = 0;
   while (!bme.begin()) {
     Serial.println("Failed to start BME680 sensor! Please check your wiring. Retrying...");
+    bme680SetupRetry++;
+    if (bme680SetupRetry > MAX_RETRY_LIMIT){
+      ErrorLoop("Cannot start BME680 sensor!");
+    }
     delay(2000);
   }
 
@@ -141,14 +150,20 @@ void SetupBME680(){
 
 }
 
+int ccs811SetupRetry = 0;
 void SetupCCS811(){
   Serial.println("CCS811 starting...");
-  
+
+  ccs811SetupRetry = 0;
   while(!ccs.begin()){
     Serial.println("Failed to start CCS811 sensor! Please check your wiring. Retrying...");
+    ccs811SetupRetry++;
+    if (ccs811SetupRetry > MAX_RETRY_LIMIT){
+      ErrorLoop("Cannot start CCS811 sensor!");
+    }
     delay(2000);
   }
-
+  
   Serial.println("CCS811 started.");
 
   //calibrate temperature sensor
@@ -190,6 +205,7 @@ void UpdateMonitoring(){
   Serial.println("=====BME680=====");
   if (!bme.performReading()) {
     Serial.println("Failed to perform reading from BME680 :(");
+    PostStatusMessage("Failed to perform reading from BME680 :(");
     return;
   }
 
@@ -227,10 +243,12 @@ void UpdateMonitoring(){
   Serial.println("=====CCS811=====");
   if(!ccs.available()){
     Serial.println("Error! CCS811 not available.");
+    PostStatusMessage("Error! CCS811 not available.");
     return;
   }
   if(ccs.readData()){
     Serial.println("Failed to perform reading from CCS811 :(");
+    PostStatusMessage("Failed to perform reading from CCS811 :(");
     return;
   }
   
@@ -267,4 +285,33 @@ void UpdateMonitoring(){
   ThingSpeak.setField(8, temperature_estimate);
   
   ThingSpeak.writeFields(THING_SPEAK_CHANNEL_NUMBER, WRITE_API_KEY);
+}
+
+//Note: max bytes for a status message is 255 bytes
+void ErrorLoop(String errorMessage){
+  Serial.println("An error has occured! Please restart and check connections. Message:");
+  Serial.println(errorMessage);
+
+  String statusMessage = "Error! Needs restart. ";
+  statusMessage += errorMessage;
+  PostStatusMessage(statusMessage);
+
+  //loop forever in error land
+  while(1){
+    digitalWrite(errorLED, HIGH);
+    delay(1000);
+    digitalWrite(errorLED, LOW);
+    delay(1000);
+
+    Serial.println("An error has occured! Please restart and check connections. Message:");
+    Serial.println(errorMessage);
+  }
+}
+
+void PostStatusMessage(String statusMessage){
+
+  if (WiFi.status() == WL_CONNECTED){
+    ThingSpeak.setStatus(statusMessage);
+    ThingSpeak.writeFields(THING_SPEAK_CHANNEL_NUMBER, WRITE_API_KEY);
+  }
 }
