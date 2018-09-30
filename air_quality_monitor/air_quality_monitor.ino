@@ -57,6 +57,14 @@ void setup() {
   Serial.begin(9600);
   pinMode(errorLED, OUTPUT);
 
+  // Giving it a little time because the serial monitor doesn't
+  // immediately attach. Want the firmware that's running to
+  // appear on each upload.
+  delay(2000);
+
+  Serial.println();
+  Serial.println("Running Firmware.");
+
   SetupWifi();
 
   SetupBME680();        //Temperature, Pressure, Humidity, Gas (TVOC), Approx Altitude
@@ -64,7 +72,7 @@ void setup() {
 
   ThingSpeak.begin(wifiClient);
 
-  Serial.println("Air monitor started.");
+  Serial.println("Air monitor started and online.");
   PostStatusMessage("Air monitor started and online.");
 }
 
@@ -75,15 +83,8 @@ void loop() {
 }
 
 
-
+//setup the wifi, can be called to reconnect if disconnected
 void SetupWifi(){
-  // Giving it a little time because the serial monitor doesn't
-  // immediately attach. Want the firmware that's running to
-  // appear on each upload.
-  delay(2000);
-
-  Serial.println();
-  Serial.println("Running Firmware.");
 
   // Connect to Wifi.
   Serial.println();
@@ -123,6 +124,8 @@ void SetupWifi(){
   Serial.println(WiFi.localIP());
   Serial.println("Hello World, I'm connected to the internets!!");
 }
+
+
 
 int bme680SetupRetry = 0;
 void SetupBME680(){
@@ -195,7 +198,7 @@ void UpdateMonitoring(){
     Serial.println(WiFi.localIP());
   } else {
     Serial.println("WiFi disconnected :(");
-    //TODO.... GOTO ERROR
+    SetupWifi();        //attempt reconnect
   }
 
   Serial.println();
@@ -284,7 +287,7 @@ void UpdateMonitoring(){
   ThingSpeak.setField(7, tvoc);
   ThingSpeak.setField(8, temperature_estimate);
   
-  ThingSpeak.writeFields(THING_SPEAK_CHANNEL_NUMBER, WRITE_API_KEY);
+  ThingSpeak.writeFields(THING_SPEAK_CHANNEL_ID, WRITE_API_KEY);
 }
 
 //Note: max bytes for a status message is 255 bytes
@@ -312,6 +315,6 @@ void PostStatusMessage(String statusMessage){
 
   if (WiFi.status() == WL_CONNECTED){
     ThingSpeak.setStatus(statusMessage);
-    ThingSpeak.writeFields(THING_SPEAK_CHANNEL_NUMBER, WRITE_API_KEY);
+    ThingSpeak.writeFields(THING_SPEAK_CHANNEL_ID, WRITE_API_KEY);
   }
 }
