@@ -6,6 +6,7 @@ See the ThingSpeak channel for this repository: https://thingspeak.com/channels/
 
 Visualizations on ThingSpeak are not included in this respository.
 
+You will need to setup WiFi and a ThingSpeak channel for this project to work.
 
 ## WiFi Setup
 
@@ -25,7 +26,9 @@ The hardware setup uses an Adafruit Huzzah32 (ESP32) WiFi microcontroller and tw
 
 Finally a 3D printable enclosure for the breadboard was made to help keep the sensors safe during transport. Made in OpenSCAD.
 
-## Libraries used:
+## Libraries used
+
+Install the following libraries to compile and upload the project.
 
 * Adafruit Unified Sensor Library v1.0.2
 * Adafruit BME680 Library v1.0.7
