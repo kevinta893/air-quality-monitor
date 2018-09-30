@@ -1,17 +1,17 @@
 
+// Sensors
 #include <Wire.h>
 #include <SPI.h>
 #include <Adafruit_Sensor.h>
 #include "Adafruit_BME680.h"
 #include "Adafruit_CCS811.h"
+#define SEALEVELPRESSURE_HPA (1013.25)
 
-//wifi
-#include <ArduinoJson.h>
+// WiFi
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
 
-#define SEALEVELPRESSURE_HPA (1013.25)
 
 // WiFi credentials. See external file
 #include "WiFi_Credentials.h"
@@ -20,8 +20,13 @@ const char* WIFI_HOSTNAME = "Arduino Air Monitor";
 // ThingSpeak API
 #include <ThingSpeak.h>
 #include "ThingSpeak_API_Keys.h"
+const int MIN_UPDATE_INTERVAL = 15 * 1000;
 const int UPDATE_INTERVAL_SECONDS = 60 * 1000;
+const int WARMUP_PERIOD = (30 * 60 * 1000) + MIN_UPDATE_INTERVAL + (5*1000);    //at 30 minutes, do an update to notify sensors have been warmed up. additional 15-20 seconds to avoid colliding with other messages
 
+
+// Task scheduler
+#include <TaskScheduler.h>
 
 //sensors
 Adafruit_BME680 bme;     //I2C
@@ -51,7 +56,9 @@ const int MAX_WIFI_RETRY_LIMIT = 15;
 
 
 WiFiClient wifiClient;
-
+Scheduler runner;
+Task updateMonitoring(UPDATE_INTERVAL_SECONDS, TASK_FOREVER, &UpdateMonitoring);
+Task warmupPeriodDone(WARMUP_PERIOD, 1, &WarmupNotify);
 
 void setup() {
   Serial.begin(9600);
@@ -70,15 +77,24 @@ void setup() {
   SetupBME680();        //Temperature, Pressure, Humidity, Gas (TVOC), Approx Altitude
   SetupCCS811();        //Temperature, CO2 (PPM), TVOC (PPB)
 
+  //begin thingspeak
   ThingSpeak.begin(wifiClient);
 
   Serial.println("Air monitor started and online.");
   PostStatusMessage("Air monitor started and online.");
+
+  //execute the monitoring thread
+  Serial.println("Starting monitoring...");
+  runner.init();
+  runner.addTask(updateMonitoring);
+  runner.addTask(warmupPeriodDone);
+  updateMonitoring.enable();
+  warmupPeriodDone.enable();
 }
 
+
 void loop() {
-  UpdateMonitoring();
-  delay(UPDATE_INTERVAL_SECONDS);
+  runner.execute();
 
 }
 
@@ -176,8 +192,8 @@ void SetupCCS811(){
 }
 
 
-unsigned int frameCount = 0;
 
+unsigned int frameCount = 0;
 void UpdateMonitoring(){
 
   //print current frame
@@ -289,6 +305,14 @@ void UpdateMonitoring(){
   
   ThingSpeak.writeFields(THING_SPEAK_CHANNEL_ID, WRITE_API_KEY);
 }
+
+
+void WarmupNotify(){
+  Serial.println("Sensors have sufficiently warmed up for 30 minutes");
+  PostStatusMessage("Sensors have sufficiently warmed up for 30 minutes");
+}
+
+
 
 //Note: max bytes for a status message is 255 bytes
 void ErrorLoop(String errorMessage){
