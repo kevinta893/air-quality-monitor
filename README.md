@@ -19,6 +19,12 @@ Visualizations on ThingSpeak are not included in this respository.
 2. Enter the desired ThingSpeak API key information (the channel ID and write API key)
 3. Compile and you should recieve no missing file errors or missing variables
 
+## Wiring and Hardware
+
+The hardware setup uses an Adafruit Huzzah32 (ESP32) WiFi microcontroller and two enviromental sensors BME680 and CCS811. The sensors are connected via the I2C protocol. A 4.7k pull-up resistor setup is used for both the SDA and SCK lines. See included wiring diagram.
+
+Finally a 3D printable enclosure for the breadboard was made to help keep the sensors safe during transport. Made in OpenSCAD.
+
 ## Libraries used:
 
 * Adafruit Unified Sensor Library v1.0.2
