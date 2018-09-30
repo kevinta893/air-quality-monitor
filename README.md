@@ -34,3 +34,4 @@ Install the following libraries to compile and upload the project.
 * Adafruit BME680 Library v1.0.7
 * Adafruit CCS811 Library v1.0.1
 * ThingSpeak v1.3.3
+* TaskScheduler v2.6.1
