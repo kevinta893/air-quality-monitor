@@ -1,6 +1,11 @@
 # air-quality-monitor
 
-Intended for use with the Adafruit HUZZAH32 – ESP32 Feather Board.
+Intended for use with the Adafruit HUZZAH32 – ESP32 Feather Board using the BME680, and CCS811 enviromental sensors. It publishes data onto ThingSpeak at a rate one update per minute. 
+
+See the ThingSpeak channel for this repository: https://thingspeak.com/channels/585230
+
+Visualizations on ThingSpeak are not included in this respository.
+
 
 ## WiFi Setup
 
@@ -11,7 +16,7 @@ Intended for use with the Adafruit HUZZAH32 – ESP32 Feather Board.
 ## ThingSpeak
 
 1. Make a copy of *ThingSpeak_API_Keys_sample.h* and rename it to *ThingSpeak_API_Keys.h*
-2. Enter the desired ThingSpeak API key information
+2. Enter the desired ThingSpeak API key information (the channel ID and write API key)
 3. Compile and you should recieve no missing file errors or missing variables
 
 ## Libraries used:
