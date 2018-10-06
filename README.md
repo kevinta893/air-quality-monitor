@@ -26,6 +26,8 @@ The hardware setup uses an Adafruit Huzzah32 (ESP32) WiFi microcontroller and tw
 
 Finally a 3D printable enclosure for the breadboard was made to help keep the sensors safe during transport. Made in OpenSCAD.
 
+Note: The system runs at approximately 36.44mA/h. A 4000 mAh usb battery was drained completely from full chargein about 29.27 hours. This is a rough estimate and your usage may vary.
+
 ## Libraries used
 
 Install the following libraries to compile and upload the project.
