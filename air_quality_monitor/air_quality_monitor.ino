@@ -20,10 +20,12 @@ const char* WIFI_HOSTNAME = "Arduino Air Monitor";
 // ThingSpeak API
 #include <ThingSpeak.h>
 #include "ThingSpeak_API_Keys.h"
+
+//task scheduling constants
 const int MIN_UPDATE_INTERVAL = 15 * 1000;
 const int UPDATE_INTERVAL_SECONDS = 3 * 60 * 1000;
-const int WARMUP_PERIOD = (30 * 60 * 1000) + MIN_UPDATE_INTERVAL + (5*1000);    //at 30 minutes, do an update to notify sensors have been warmed up. additional 15-20 seconds to avoid colliding with other messages
-
+const int WARMUP_PERIOD = (30 * 60 * 1000) + MIN_UPDATE_INTERVAL + (5*1000);    //at 30 minutes, do an update to notify sensors have been warmed up. additional 15-20 seconds to avoid colliding with other tasks
+const int RESTART_INVERVAL = (5 * 24 * 60 * 1000);          // for resetting every few days
 
 // Task scheduler
 #include <TaskScheduler.h>
@@ -54,11 +56,11 @@ const int MAX_RETRY_LIMIT = 20;
 const int MAX_WIFI_RETRY_LIMIT = 15;
 
 
-
 WiFiClient wifiClient;
 Scheduler runner;
 Task updateMonitoring(UPDATE_INTERVAL_SECONDS, TASK_FOREVER, &UpdateMonitoring);
 Task warmupPeriodDone(WARMUP_PERIOD, 1, &WarmupNotify);
+Task restartSystem(RESTART_INVERVAL, TASK_FOREVER, &RestartSystemRegular);
 
 void setup() {
   Serial.begin(9600);
@@ -88,8 +90,10 @@ void setup() {
   runner.init();
   runner.addTask(updateMonitoring);
   runner.addTask(warmupPeriodDone);
+  runner.addTask(restartSystem);
   updateMonitoring.enable();
   warmupPeriodDone.enable();
+  restartSystem.enable();
 }
 
 
@@ -312,6 +316,18 @@ void WarmupNotify(){
   PostStatusMessage("Sensors have sufficiently warmed up for 30 minutes");
 }
 
+// Restarts the system at a specified time for regular maintenance
+void RestartSystemRegular(){
+  PostStatusMessage("Executing regularly scheduled reset. Restarting system...");
+  Serial.println("Executing regularly scheduled system restart.");
+  ResetSystem();
+}
+
+// Restarts the system
+void ResetSystem(){
+  Serial.println("Restarting system...");
+  esp_restart();
+}
 
 
 //Note: max bytes for a status message is 255 bytes
