@@ -92,8 +92,8 @@ void setup() {
   runner.addTask(warmupPeriodDone);
   runner.addTask(restartSystem);
   updateMonitoring.enable();
-  warmupPeriodDone.enable();
-  restartSystem.enable();
+  warmupPeriodDone.enableDelayed();
+  restartSystem.enableDelayed();
 }
 
 
