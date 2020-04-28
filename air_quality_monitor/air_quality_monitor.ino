@@ -120,7 +120,9 @@ void SetupWifi(){
   Serial.println("Connecting...");
   WiFi.setHostname(WIFI_HOSTNAME);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
-
+  delay(5000);
+  
+  int checkCount = 0;
   while (WiFi.status() != WL_CONNECTED) {
     // Check to see if connecting failed.
     // This is due to incorrect credentials
@@ -130,7 +132,11 @@ void SetupWifi(){
       Serial.print("SSID: ");
       Serial.println(WIFI_SSID);
     }
+
     delay(5000);
+    Serial.print("#");
+    Serial.print(checkCount++);
+    Serial.println(" Waiting for WiFi...");
   }
 
 
