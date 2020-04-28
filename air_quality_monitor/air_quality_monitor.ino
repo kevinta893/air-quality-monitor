@@ -25,7 +25,7 @@ const char* WIFI_HOSTNAME = "Arduino Air Monitor";
 const int MIN_UPDATE_INTERVAL = 15 * 1000;
 const int UPDATE_INTERVAL_SECONDS = 3 * 60 * 1000;
 const int WARMUP_PERIOD = (30 * 60 * 1000) + MIN_UPDATE_INTERVAL + (5*1000);    //at 30 minutes, do an update to notify sensors have been warmed up. additional 15-20 seconds to avoid colliding with other tasks
-const int RESTART_INVERVAL = (5 * 24 * 60 * 1000);          // for resetting every few days
+const int RESTART_INVERVAL = (2 * 24 * 60 * 1000);          // for resetting every few days
 
 // Task scheduler
 #include <TaskScheduler.h>
