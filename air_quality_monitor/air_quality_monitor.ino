@@ -1,70 +1,72 @@
-
 // Sensors
 #include <Wire.h>
 #include <SPI.h>
 #include <Adafruit_Sensor.h>
 #include "Adafruit_BME680.h"
 #include "Adafruit_CCS811.h"
-#define SEALEVELPRESSURE_HPA (1013.25)
 
 // WiFi
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
 
-
 // WiFi credentials. See external file
 #include "WiFi_Credentials.h"
-const char* WIFI_HOSTNAME = "Arduino Air Monitor";
 
 // ThingSpeak API
 #include <ThingSpeak.h>
 #include "ThingSpeak_API_Keys.h"
 
-//task scheduling constants
+// Task scheduler
+#include <TaskScheduler.h>
+
+// Task scheduling constants
 const int MIN_UPDATE_INTERVAL = 15 * 1000;
 const int UPDATE_INTERVAL_SECONDS = 3 * 60 * 1000;
 const int WARMUP_PERIOD = (30 * 60 * 1000) + MIN_UPDATE_INTERVAL + (5*1000);    //at 30 minutes, do an update to notify sensors have been warmed up. additional 15-20 seconds to avoid colliding with other tasks
 const int RESTART_INVERVAL = (1 * 24 * 60 * 60 * 1000);          // for resetting every few days
 
-// Task scheduler
-#include <TaskScheduler.h>
-
-//sensors
-Adafruit_BME680 bme;     //I2C
-Adafruit_CCS811 ccs;     //I2C
-
-
-
-int errorLED = 13;     //used to indicate error
-
-
-//BME 680 Calibration
+// BME 680 Calibration
+#define SEALEVELPRESSURE_HPA (1013.25)
 const float TEMP_OFFSET = -2.1f;
 const float PRESSURE_OFFSET = 0;
 const float HUMIDITY_OFFSET = 0;
 const float GAS_RESISTANCE_OFFSET = 0;
 const float ALTITUDE_OFFSET = 0;
 
-//ccs811
+// CCS811 Calibration
 const float CO2_OFFSET = 0;
 const float TVOC_OFFSET = 0; 
 const float TEMP_811_OFFSET = 0;
 
-//retry limit
+// Retry limit
 const int MAX_RETRY_LIMIT = 20;
 const int MAX_WIFI_RETRY_LIMIT = 15;
 
+// System
+const int ERROR_LED_PIN = 13;     //used to indicate error
+const char* WIFI_HOSTNAME = "Arduino Air Monitor";
 
+
+// Sensors
+Adafruit_BME680 bme;     //I2C
+Adafruit_CCS811 ccs;     //I2C
+
+// WiFi
 WiFiClient wifiClient;
+
+// Scheduling
 Scheduler runner;
 Task updateMonitoring(UPDATE_INTERVAL_SECONDS, TASK_FOREVER, &UpdateMonitoring);
 Task warmupPeriodDone(WARMUP_PERIOD, 1, &WarmupNotify);
 Task restartSystem(RESTART_INVERVAL, TASK_FOREVER, &RestartSystemRegular);
 
+/**
+ * Setup system
+ */
 void setup() {
   Serial.begin(9600);
-  pinMode(errorLED, OUTPUT);
+  pinMode(ERROR_LED_PIN, OUTPUT);
 
   // Giving it a little time because the serial monitor doesn't
   // immediately attach. Want the firmware that's running to
@@ -79,13 +81,13 @@ void setup() {
   SetupBME680();        //Temperature, Pressure, Humidity, Gas (TVOC), Approx Altitude
   SetupCCS811();        //Temperature, CO2 (PPM), TVOC (PPB)
 
-  //begin thingspeak
+  //Begin thingspeak
   ThingSpeak.begin(wifiClient);
 
   Serial.println("Air monitor started and online.");
   PostStatusMessage("Air monitor started and online.");
 
-  //execute the monitoring thread
+  //Execute the monitoring thread
   Serial.println("Starting monitoring...");
   runner.init();
   runner.addTask(updateMonitoring);
@@ -96,14 +98,18 @@ void setup() {
   restartSystem.enableDelayed();
 }
 
-
+/**
+ * Run the scheduling loop
+ */
 void loop() {
   runner.execute();
-
 }
 
 
-//setup the wifi, can be called to reconnect if disconnected
+/**
+ * Setup the wifi
+ * Call this function again to reconnect
+ */
 void SetupWifi(){
 
   // Connect to Wifi.
@@ -154,6 +160,10 @@ void SetupWifi(){
 
 
 int bme680SetupRetry = 0;
+/**
+ * Setup the BME680 sensor
+ * Has retry loop to reconnect if setup fails
+ */
 void SetupBME680(){
   while (!Serial);
   Serial.println("BME680 starting...");
@@ -176,10 +186,13 @@ void SetupBME680(){
   bme.setPressureOversampling(BME680_OS_4X);
   bme.setIIRFilterSize(BME680_FILTER_SIZE_3);
   bme.setGasHeater(320, 150); // 320*C for 150 ms
-
 }
 
 int ccs811SetupRetry = 0;
+/**
+ * Setup the CCS811 sensor
+ * Has retry loop to reconnect if setup fails
+ */
 void SetupCCS811(){
   Serial.println("CCS811 starting...");
 
@@ -204,6 +217,9 @@ void SetupCCS811(){
 
 
 unsigned int frameCount = 0;
+/**
+ * Updates ThingSpeak with new monitoring values
+ */
 void UpdateMonitoring(){
 
   //print current frame
@@ -302,7 +318,6 @@ void UpdateMonitoring(){
 
   frameCount++;
 
-
   //now send information to ThingSpeak
   ThingSpeak.setField(1, temperature);
   ThingSpeak.setField(2, pressure);
@@ -313,30 +328,47 @@ void UpdateMonitoring(){
   ThingSpeak.setField(7, tvoc);
   ThingSpeak.setField(8, temperature_estimate);
   
-  ThingSpeak.writeFields(THING_SPEAK_CHANNEL_ID, WRITE_API_KEY);
+  int httpStatus = ThingSpeak.writeFields(THING_SPEAK_CHANNEL_ID, WRITE_API_KEY);
+  if (httpStatus != 200){
+    Serial.print("Error writing to Thingspeak Channel. HTTP Status code= ");
+    Serial.println(httpStatus);
+  }
+  else{
+    Serial.print("ThingSpeak update successful. HTTP Status code=");
+    Serial.println(httpStatus);
+  }
 }
 
-
+/**
+ * Callback for warmup period complete message
+ */
 void WarmupNotify(){
   Serial.println("Sensors have sufficiently warmed up for 30 minutes");
   PostStatusMessage("Sensors have sufficiently warmed up for 30 minutes");
 }
 
-// Restarts the system at a specified time for regular maintenance
+/** 
+ * Restarts the system at a specified time for regular maintenance
+ */
 void RestartSystemRegular(){
   PostStatusMessage("Executing regularly scheduled reset. Restarting system...");
   Serial.println("Executing regularly scheduled system restart.");
   ResetSystem();
 }
 
-// Restarts the system
+/**
+ * Restarts the system
+ */
 void ResetSystem(){
   Serial.println("Restarting system...");
   esp_restart();
 }
 
 
-//Note: max bytes for a status message is 255 bytes
+/**
+ * Puts the system into a perpetual error stage with the
+ * Error LED blinking
+ */
 void ErrorLoop(String errorMessage){
   Serial.println("An error has occured! Please restart and check connections. Message:");
   Serial.println(errorMessage);
@@ -347,9 +379,9 @@ void ErrorLoop(String errorMessage){
 
   //loop forever in error land
   while(1){
-    digitalWrite(errorLED, HIGH);
+    digitalWrite(ERROR_LED_PIN, HIGH);
     delay(1000);
-    digitalWrite(errorLED, LOW);
+    digitalWrite(ERROR_LED_PIN, LOW);
     delay(1000);
 
     Serial.println("An error has occured! Please restart and check connections. Message:");
@@ -357,8 +389,12 @@ void ErrorLoop(String errorMessage){
   }
 }
 
+/**
+ * Sends a status message to the thingspeak channel
+ */
 void PostStatusMessage(String statusMessage){
 
+  //Note: max bytes for a status message is 255 bytes
   if (WiFi.status() == WL_CONNECTED){
     ThingSpeak.setStatus(statusMessage);
     ThingSpeak.writeFields(THING_SPEAK_CHANNEL_ID, WRITE_API_KEY);
