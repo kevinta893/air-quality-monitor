@@ -6,8 +6,7 @@
 #include "AirMonitor_WiFi.h"
 
 // ThingSpeak API
-#include <ThingSpeak.h>
-#include "ThingSpeak_API_Keys.h"
+#include "AirMonitor_ThingSpeak.h"
 
 // Task scheduler
 #include <TaskScheduler.h>
@@ -47,20 +46,22 @@ void setup() {
   Serial.println("Running Firmware.");
 
   //Setup WiFi
-  if (SetupWifi() == false){
+  if (!SetupWifi()){
     ErrorLoop("Cannot start WiFi!");
   }
 
   //Setup sensors
-  if (SetupBME680() == false){
+  if (!SetupBME680()){
     ErrorLoop("Cannot start BME680 sensor!");
   }
-  if (SetupCCS811() == false){
-    ErrorLoop("Cannot start CCS811 sensor!");        
+  if (!SetupCCS811()){
+    ErrorLoop("Cannot start CCS811 sensor!");
   }
 
-  //Begin thingspeak
-  ThingSpeak.begin(wifiClient);
+  //Setup ThingSpeak
+  if (!SetupThingSpeak(wifiClient)){
+    ErrorLoop("Cannot start ThingSpeak!");
+  }
 
   Serial.println("Air monitor started and online.");
   PostStatusMessage("Air monitor started and online.");
