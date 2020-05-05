@@ -1,17 +1,9 @@
 // Sensors
-#include <Wire.h>
-#include <SPI.h>
-#include <Adafruit_Sensor.h>
-#include "Adafruit_BME680.h"
-#include "Adafruit_CCS811.h"
+#include "BME680.h"
+#include "CCS811.h"
 
 // WiFi
-#include <Arduino.h>
-#include <WiFi.h>
-#include <WiFiUdp.h>
-
-// WiFi credentials. See external file
-#include "WiFi_Credentials.h"
+#include "AirMonitor_WiFi.h"
 
 // ThingSpeak API
 #include <ThingSpeak.h>
@@ -26,34 +18,12 @@
 #define WARMUP_PERIOD ((30 * 60 * 1000) + MIN_UPDATE_INTERVAL + (5*1000))    //at 30 minutes, do an update to notify sensors have been warmed up. additional 15-20 seconds to avoid colliding with other tasks
 #define RESTART_INVERVAL ((1 * 24 * 60 * 60 * 1000))          // for resetting every few days
 
-// BME 680 Calibration
-#define SEALEVELPRESSURE_HPA 1013.25
-#define TEMP_OFFSET -2.1f
-#define PRESSURE_OFFSET 0
-#define HUMIDITY_OFFSET 0
-#define GAS_RESISTANCE_OFFSET 0
-#define ALTITUDE_OFFSET 0
-
-// CCS811 Calibration
-#define CO2_OFFSET 0
-#define TVOC_OFFSET 0
-#define TEMP_811_OFFSET 0
-
 // Retry limit
-#define MAX_RETRY_LIMIT 20
 #define MAX_WIFI_RETRY_LIMIT 15
 
 // System
 #define ERROR_LED_PIN 13     //used to indicate error
-#define WIFI_HOSTNAME "Arduino Air Monitor"
 
-
-// Sensors
-Adafruit_BME680 bme;     //I2C
-Adafruit_CCS811 ccs;     //I2C
-
-// WiFi
-WiFiClient wifiClient;
 
 // Scheduling
 Scheduler runner;
@@ -76,10 +46,18 @@ void setup() {
   Serial.println();
   Serial.println("Running Firmware.");
 
-  SetupWifi();
+  //Setup WiFi
+  if (SetupWifi() == false){
+    ErrorLoop("Cannot start WiFi!");
+  }
 
-  SetupBME680();        //Temperature, Pressure, Humidity, Gas (TVOC), Approx Altitude
-  SetupCCS811();        //Temperature, CO2 (PPM), TVOC (PPB)
+  //Setup sensors
+  if (SetupBME680() == false){
+    ErrorLoop("Cannot start BME680 sensor!");
+  }
+  if (SetupCCS811() == false){
+    ErrorLoop("Cannot start CCS811 sensor!");        
+  }
 
   //Begin thingspeak
   ThingSpeak.begin(wifiClient);
@@ -104,117 +82,6 @@ void setup() {
 void loop() {
   runner.execute();
 }
-
-
-/**
- * Setup the wifi
- * Call this function again to reconnect
- */
-void SetupWifi(){
-
-  // Connect to Wifi.
-  Serial.println();
-  Serial.println();
-  Serial.print("Connecting to ");
-  Serial.println(WIFI_SSID);
-
-  // Set WiFi to station mode and disconnect from an AP if it was previously connected
-  WiFi.mode(WIFI_STA);
-  WiFi.disconnect();
-  delay(100);
-
-  Serial.println("Connecting...");
-  WiFi.setHostname(WIFI_HOSTNAME);
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  delay(5000);
-  
-  int checkCount = 0;
-  while (WiFi.status() != WL_CONNECTED) {
-    // Check to see if connecting failed.
-    // This is due to incorrect credentials
-    if (WiFi.status() == WL_CONNECT_FAILED) {
-      Serial.println("Failed to connect to WIFI. Please verify credentials: ");
-      Serial.println();
-      Serial.print("SSID: ");
-      Serial.println(WIFI_SSID);
-    }
-
-    delay(5000);
-    Serial.print("#");
-    Serial.print(checkCount++);
-    Serial.println(" Waiting for WiFi...");
-  }
-
-
-  //Connected! Yay
-
-
-  //print debug information
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
-  Serial.println("Hello World, I'm connected to the internets!!");
-}
-
-
-
-int bme680SetupRetry = 0;
-/**
- * Setup the BME680 sensor
- * Has retry loop to reconnect if setup fails
- */
-void SetupBME680(){
-  while (!Serial);
-  Serial.println("BME680 starting...");
-
-  bme680SetupRetry = 0;
-  while (!bme.begin()) {
-    Serial.println("Failed to start BME680 sensor! Please check your wiring. Retrying...");
-    bme680SetupRetry++;
-    if (bme680SetupRetry > MAX_RETRY_LIMIT){
-      ErrorLoop("Cannot start BME680 sensor!");
-    }
-    delay(2000);
-  }
-
-  Serial.println("BME680 started.");
-
-  // Set up oversampling and filter initialization
-  bme.setTemperatureOversampling(BME680_OS_8X);
-  bme.setHumidityOversampling(BME680_OS_2X);
-  bme.setPressureOversampling(BME680_OS_4X);
-  bme.setIIRFilterSize(BME680_FILTER_SIZE_3);
-  bme.setGasHeater(320, 150); // 320*C for 150 ms
-}
-
-int ccs811SetupRetry = 0;
-/**
- * Setup the CCS811 sensor
- * Has retry loop to reconnect if setup fails
- */
-void SetupCCS811(){
-  Serial.println("CCS811 starting...");
-
-  ccs811SetupRetry = 0;
-  while(!ccs.begin()){
-    Serial.println("Failed to start CCS811 sensor! Please check your wiring. Retrying...");
-    ccs811SetupRetry++;
-    if (ccs811SetupRetry > MAX_RETRY_LIMIT){
-      ErrorLoop("Cannot start CCS811 sensor!");
-    }
-    delay(2000);
-  }
-  
-  Serial.println("CCS811 started.");
-
-  //calibrate temperature sensor
-  while(!ccs.available());
-  float temp = ccs.calculateTemperature();
-  ccs.setTempOffset(temp - 25.0);
-}
-
-
 
 unsigned int frameCount = 0;
 /**
@@ -330,10 +197,12 @@ void UpdateMonitoring(){
   
   int httpStatus = ThingSpeak.writeFields(THING_SPEAK_CHANNEL_ID, WRITE_API_KEY);
   if (httpStatus != 200){
+    digitalWrite(ERROR_LED_PIN, HIGH);
     Serial.print("Error writing to Thingspeak Channel. HTTP Status code= ");
     Serial.println(httpStatus);
   }
   else{
+    digitalWrite(ERROR_LED_PIN, LOW);
     Serial.print("ThingSpeak update successful. HTTP Status code=");
     Serial.println(httpStatus);
   }
