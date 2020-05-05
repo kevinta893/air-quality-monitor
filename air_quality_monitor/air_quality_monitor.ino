@@ -90,24 +90,25 @@ unsigned int frameCount = 0;
  */
 void UpdateMonitoring(){
 
-  //print current frame
+  //Current frame header
   Serial.print("--------------Frame #");
   Serial.print(frameCount);
   Serial.println("--------------");
 
 
 
-  //wifi state
-  Serial.println("=====WIFI State=====");
+  //Wifi state
+  Serial.println("# WIFI State");
   WiFi.status();
   WiFi.localIP();
 
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("WiFi Connected");
+    Serial.println("WiFi is Connected");
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
   } else {
     Serial.println("WiFi disconnected :(");
+    Serial.println("Reconnecting...");
     SetupWifi();        //attempt reconnect
   }
 
@@ -115,88 +116,79 @@ void UpdateMonitoring(){
 
 
   //BME680
-  Serial.println("=====BME680=====");
-  if (!bme.performReading()) {
-    Serial.println("Failed to perform reading from BME680 :(");
-    PostStatusMessage("Failed to perform reading from BME680 :(");
+  Serial.println("# BME680");
+
+  BME680DataFrame bme680Reading;
+  if (!ReadBME680(&bme680Reading)){
+    String errorMessage = "Failed to perform reading from BME680 :(";
+    Serial.println(errorMessage);
+    PostStatusMessage(errorMessage);
     return;
   }
-
-  float temperature = bme.temperature + TEMP_OFFSET;
-  float pressure = (bme.pressure / 100.0) + PRESSURE_OFFSET;
-  float humidity = bme.humidity + HUMIDITY_OFFSET;
-  float gas_resistance = (bme.gas_resistance / 1000.0f) + GAS_RESISTANCE_OFFSET;
-  float altitude = bme.readAltitude(SEALEVELPRESSURE_HPA) + ALTITUDE_OFFSET;
   
 
   Serial.print("Temperature = ");
-  Serial.print(temperature);
+  Serial.print(bme680Reading.temperature);
   Serial.println(" *C");
 
   Serial.print("Pressure = ");
-  Serial.print(pressure);
+  Serial.print(bme680Reading.pressure);
   Serial.println(" hPa");
 
   Serial.print("Humidity = ");
-  Serial.print(humidity);
+  Serial.print(bme680Reading.humidity);
   Serial.println(" %");
 
   Serial.print("Gas = ");
-  Serial.print(gas_resistance);
+  Serial.print(bme680Reading.gas_resistance);
   Serial.println(" KOhms");
 
   Serial.print("Approx. Altitude = ");
-  Serial.print(altitude);
+  Serial.print(bme680Reading.altitude);
   Serial.println(" m");
 
   Serial.println();
 
 
   //CCS811
-  Serial.println("=====CCS811=====");
-  if(!ccs.available()){
-    Serial.println("Error! CCS811 not available.");
-    PostStatusMessage("Error! CCS811 not available.");
-    return;
-  }
-  if(ccs.readData()){
-    Serial.println("Failed to perform reading from CCS811 :(");
-    PostStatusMessage("Failed to perform reading from CCS811 :(");
-    return;
-  }
-  
-  //add enviromental data to improve readings
-  ccs.setEnvironmentalData(bme.humidity + HUMIDITY_OFFSET, bme.temperature + TEMP_OFFSET);
+  Serial.println("# CCS811");
 
-  float co2 = ccs.geteCO2() + CO2_OFFSET;
-  float tvoc = ccs.getTVOC() + TVOC_OFFSET;
-  float temperature_estimate = ccs.calculateTemperature() + TEMP_811_OFFSET;
+  
+  //Read CCS811
+  CCS811DataFrame ccs811Reading;
+  if (!ReadCCS811(bme680Reading.humidity, bme680Reading.temperature, &ccs811Reading)){
+    String errorMessage = "Failed to perform reading from CCS811 :(";
+    Serial.println(errorMessage);
+    PostStatusMessage(errorMessage);
+    return;
+  }
 
   Serial.print("CO2: ");
-  Serial.print(co2);
+  Serial.print(ccs811Reading.co2);
   Serial.print("ppm, TVOC: ");
-  Serial.print(tvoc);
-  Serial.print("ppb   Temp:");
-  Serial.println(temperature_estimate);
+  Serial.print(ccs811Reading.tvoc);
+  Serial.print("ppb,   Temp:");
+  Serial.println(ccs811Reading.temperature_estimate);
  
 
   Serial.println();
-  Serial.println();
+  Serial.println("# ThingSpeak");
 
 
-  frameCount++;
 
-  //now send information to ThingSpeak
-  ThingSpeak.setField(1, temperature);
-  ThingSpeak.setField(2, pressure);
-  ThingSpeak.setField(3, humidity);
-  ThingSpeak.setField(4, gas_resistance);
-  ThingSpeak.setField(5, altitude);
-  ThingSpeak.setField(6, co2);
-  ThingSpeak.setField(7, tvoc);
-  ThingSpeak.setField(8, temperature_estimate);
+  //Send sensor readings to ThingSpeak
+  ThingSpeakUpdateFrame updateFrame;
+  updateFrame.temperature = bme680Reading.temperature;
+  updateFrame.pressure = bme680Reading.pressure;
+  updateFrame.humidity = bme680Reading.humidity;
+  updateFrame.gas_resistance = bme680Reading.gas_resistance;
+  updateFrame.altitude = bme680Reading.altitude;
+  updateFrame.co2 = ccs811Reading.co2;
+  updateFrame.tvoc = ccs811Reading.tvoc;
+  updateFrame.temperature_estimate = ccs811Reading.temperature_estimate;
+
   
-  int httpStatus = ThingSpeak.writeFields(THING_SPEAK_CHANNEL_ID, WRITE_API_KEY);
+  int httpStatus = WriteFieldsThingSpeak(&updateFrame);
   if (httpStatus != 200){
     digitalWrite(ERROR_LED_PIN, HIGH);
     Serial.print("Error writing to Thingspeak Channel. HTTP Status code= ");
@@ -207,6 +199,8 @@ void UpdateMonitoring(){
     Serial.print("ThingSpeak update successful. HTTP Status code=");
     Serial.println(httpStatus);
   }
+
+  frameCount++;
 }
 
 /**
@@ -247,7 +241,7 @@ void ErrorLoop(String errorMessage){
   statusMessage += errorMessage;
   PostStatusMessage(statusMessage);
 
-  //loop forever in error land
+  //loop forever in error land blinking
   while(1){
     digitalWrite(ERROR_LED_PIN, HIGH);
     delay(1000);
