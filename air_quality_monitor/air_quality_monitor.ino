@@ -21,31 +21,31 @@
 #include <TaskScheduler.h>
 
 // Task scheduling constants
-const int MIN_UPDATE_INTERVAL = 15 * 1000;
-const int UPDATE_INTERVAL_SECONDS = 3 * 60 * 1000;
-const int WARMUP_PERIOD = (30 * 60 * 1000) + MIN_UPDATE_INTERVAL + (5*1000);    //at 30 minutes, do an update to notify sensors have been warmed up. additional 15-20 seconds to avoid colliding with other tasks
-const int RESTART_INVERVAL = (1 * 24 * 60 * 60 * 1000);          // for resetting every few days
+#define MIN_UPDATE_INTERVAL (15 * 1000)
+#define UPDATE_INTERVAL_SECONDS (3 * 60 * 1000)
+#define WARMUP_PERIOD ((30 * 60 * 1000) + MIN_UPDATE_INTERVAL + (5*1000))    //at 30 minutes, do an update to notify sensors have been warmed up. additional 15-20 seconds to avoid colliding with other tasks
+#define RESTART_INVERVAL ((1 * 24 * 60 * 60 * 1000))          // for resetting every few days
 
 // BME 680 Calibration
-#define SEALEVELPRESSURE_HPA (1013.25)
-const float TEMP_OFFSET = -2.1f;
-const float PRESSURE_OFFSET = 0;
-const float HUMIDITY_OFFSET = 0;
-const float GAS_RESISTANCE_OFFSET = 0;
-const float ALTITUDE_OFFSET = 0;
+#define SEALEVELPRESSURE_HPA 1013.25
+#define TEMP_OFFSET -2.1f
+#define PRESSURE_OFFSET 0
+#define HUMIDITY_OFFSET 0
+#define GAS_RESISTANCE_OFFSET 0
+#define ALTITUDE_OFFSET 0
 
 // CCS811 Calibration
-const float CO2_OFFSET = 0;
-const float TVOC_OFFSET = 0; 
-const float TEMP_811_OFFSET = 0;
+#define CO2_OFFSET 0
+#define TVOC_OFFSET 0
+#define TEMP_811_OFFSET 0
 
 // Retry limit
-const int MAX_RETRY_LIMIT = 20;
-const int MAX_WIFI_RETRY_LIMIT = 15;
+#define MAX_RETRY_LIMIT 20
+#define MAX_WIFI_RETRY_LIMIT 15
 
 // System
-const int ERROR_LED_PIN = 13;     //used to indicate error
-const char* WIFI_HOSTNAME = "Arduino Air Monitor";
+#define ERROR_LED_PIN 13     //used to indicate error
+#define WIFI_HOSTNAME "Arduino Air Monitor"
 
 
 // Sensors
