@@ -13,7 +13,7 @@
 
 // Task scheduling constants
 #define MIN_UPDATE_INTERVAL (15 * 1000)
-#define UPDATE_INTERVAL_SECONDS (3 * 60 * 1000)
+#define UPDATE_INTERVAL (3 * 60 * 1000)
 #define WARMUP_PERIOD ((30 * 60 * 1000) + MIN_UPDATE_INTERVAL + (5*1000))    //at 30 minutes, do an update to notify sensors have been warmed up. additional 15-20 seconds to avoid colliding with other tasks
 #define RESTART_INVERVAL ((1 * 24 * 60 * 60 * 1000))          // for resetting every few days
 
@@ -26,7 +26,7 @@
 
 // Scheduling
 Scheduler runner;
-Task updateMonitoring(UPDATE_INTERVAL_SECONDS, TASK_FOREVER, &UpdateMonitoring);
+Task updateMonitoring(UPDATE_INTERVAL, TASK_FOREVER, &UpdateMonitoring);
 Task warmupPeriodDone(WARMUP_PERIOD, 1, &WarmupNotify);
 Task restartSystem(RESTART_INVERVAL, TASK_FOREVER, &RestartSystemRegular);
 
@@ -63,9 +63,15 @@ void setup() {
     ErrorLoop("Cannot start ThingSpeak!");
   }
 
-  Serial.println("Air monitor started and online.");
-  PostStatusMessage("Air monitor started and online.");
 
+  Serial.println("Monitoring configuration:");
+  Serial.print("Update interval (ms)=");
+  Serial.println(UPDATE_INTERVAL);
+  Serial.print("Warmup time (ms)=");
+  Serial.println(WARMUP_PERIOD);
+  Serial.print("Restart interval (ms)=");
+  Serial.println(RESTART_INVERVAL);
+  
   //Execute the monitoring thread
   Serial.println("Starting monitoring...");
   runner.init();
@@ -75,6 +81,9 @@ void setup() {
   updateMonitoring.enable();
   warmupPeriodDone.enableDelayed();
   restartSystem.enableDelayed();
+
+  Serial.println("Air monitor started and online.");
+  PostStatusMessage("Air monitor started and online.");
 }
 
 /**
