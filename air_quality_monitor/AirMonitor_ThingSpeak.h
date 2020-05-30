@@ -1,3 +1,7 @@
+// Thingspeak Debugging
+//#define PRINT_DEBUG_MESSAGES
+//#define PRINT_HTTP
+
 #include <ThingSpeak.h>
 #include "ThingSpeak_API_Keys.h"
 
