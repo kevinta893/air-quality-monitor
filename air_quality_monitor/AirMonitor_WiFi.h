@@ -7,6 +7,14 @@
 
 #define WIFI_HOSTNAME "Arduino Air Monitor"
 
+// Network config
+// If using ESP32, refer to https://github.com/espressif/arduino-esp32/tree/master/libraries/WiFi
+IPAddress local_ip(0,0,0,0);      //Leave as 0.0.0.0 to leave as auto
+IPAddress gateway(0,0,0,0);       //Leave as 0.0.0.0 to leave as auto
+IPAddress subnet(0,0,0,0);        //Leave as 0.0.0.0 to leave as auto
+IPAddress dns1(1,1,1,1);          //Optional
+IPAddress dns2(1,0,0,1);          //Optional
+
 // Access wifi using this client
 WiFiClient wifiClient;
 
@@ -29,6 +37,7 @@ bool SetupWifi(){
   delay(100);
 
   Serial.println("Connecting...");
+  WiFi.config(local_ip, gateway, subnet, dns1, dns2);
   WiFi.setHostname(WIFI_HOSTNAME);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   delay(5000);
