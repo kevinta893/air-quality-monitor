@@ -1,2 +1,4 @@
 air_quality_monitor/WiFi_Credentials.h
 air_quality_monitor/ThingSpeak_API_Keys.h
+
+.vscode/
