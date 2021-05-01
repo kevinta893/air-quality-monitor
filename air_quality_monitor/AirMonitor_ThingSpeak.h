@@ -43,3 +43,15 @@ int WriteFieldsThingSpeak(ThingSpeakUpdateFrame* updateFrame){
 
   return httpStatus;
 }
+
+/**
+ * Sends a status message to the thingspeak channel
+ */
+void PostStatusMessage(String statusMessage){
+
+  //Note: max bytes for a status message is 255 bytes
+  if (WiFi.status() == WL_CONNECTED){
+    ThingSpeak.setStatus(statusMessage);
+    ThingSpeak.writeFields(THING_SPEAK_CHANNEL_ID, WRITE_API_KEY);
+  }
+}
